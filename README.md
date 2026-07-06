@@ -101,27 +101,37 @@ The compiled binary will be placed in `./dist/WifiVision_CSI_Pipeline`. You can 
 
 ---
 
-## 🤝 Collaboration & Branching Guide (For Joachim & Co-Developers)
+## 🤝 How You and Your Brother Can Collaborate
+Once pushed, here is the recommended workflow for you and your brother to develop different versions together without overwriting each other's work:
 
-To work together smoothly and test different versions:
-1. **Always pull the latest changes before starting work**:
-   ```bash
-   git checkout main
-   git pull origin main
-   ```
-2. **Create a feature branch for your experiments**:
-   ```bash
-   git checkout -b feature/new-dsp-filter
-   ```
-3. **Commit your changes**:
-   ```bash
-   git add .
-   git commit -m "Add new Doppler velocity estimator"
-   ```
-4. **Push your branch to GitHub and open a Pull Request**:
-   ```bash
-   git push -u origin feature/new-dsp-filter
-   ```
+### 1. Pull Latest Changes Before Coding
+Every time you or your brother sit down to work:
+
+```bash
+git checkout main
+git pull origin main
+```
+
+### 2. Create a Feature Branch for New Versions or Ideas
+When trying out a new algorithm or different configuration:
+
+```bash
+# Example: Creating a branch to test a new Doppler tracking filter
+git checkout -b feature/doppler-tracking-v2
+```
+
+### 3. Save & Commit Your Changes
+```bash
+git add .
+git commit -m "Updated 3D clustering parameters and added new Doppler filter"
+```
+
+### 4. Upload Your Version to GitHub
+```bash
+git push -u origin feature/doppler-tracking-v2
+```
+
+From GitHub, you and your brother can compare branches, review each other's code, and merge the best features back into main!
 
 ---
 *Developed by MaliosDark & Joachim Grobbelaar.*
