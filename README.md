@@ -4,6 +4,8 @@
 
 ![3D Bistatic Spatial Map](3d_room_geometry_map.png)
 
+> 📖 **Want to know how the algorithms, mathematics, and RF physics work? Read our comprehensive [System Architecture & Physics Guide (How It Works)](README_HOW_IT_WORKS.md)!**
+
 Welcome to **WiFiVision v2 Beta (m01)**! This repository contains our end-to-end autonomous Wi-Fi CSI sensing engine. It transforms standard Wi-Fi packet data into a non-invasive radar and physical geometry reconstruction system capable of 3D spatial obstacle mapping, semantic material classification, Doppler human walking trajectory tracking, and real-time respiration & heart rate monitoring.
 
 ---
