@@ -520,75 +520,31 @@ class RoomCSISimulator:
                                    rx_pos: Tuple[float, float, float], clusters_3d: List[Dict[str, Any]]):
         import json
         
-        traces = []
-        # Trace 0: TX Router
-        traces.append({
-            'x': [tx_pos[0]], 'y': [tx_pos[1]], 'z': [tx_pos[2]],
-            'mode': 'markers+text', 'type': 'scatter3d', 'name': 'Sender (Router TX)',
-            'text': ['ASUS ROG AP (3.5, 4.0, 2.5m)'], 'textposition': 'top center',
-            'marker': {'size': 12, 'color': '#ef4444', 'symbol': 'circle', 'line': {'color': '#ffffff', 'width': 2}}
-        })
-        # Trace 1: RX Client
-        traces.append({
-            'x': [rx_pos[0]], 'y': [rx_pos[1]], 'z': [rx_pos[2]],
-            'mode': 'markers+text', 'type': 'scatter3d', 'name': 'Receiver (Client RX)',
-            'text': ['Intel AX210 ULA (0.0, 0.0, 1.0m)'], 'textposition': 'top center',
-            'marker': {'size': 12, 'color': '#3b82f6', 'symbol': 'diamond', 'line': {'color': '#ffffff', 'width': 2}}
-        })
-        # Trace 2: Direct LoS Beam
-        traces.append({
-            'x': [tx_pos[0], rx_pos[0]], 'y': [tx_pos[1], rx_pos[1]], 'z': [tx_pos[2], rx_pos[2]],
-            'mode': 'lines', 'type': 'scatter3d', 'name': 'Direct LoS Beam (5.2 GHz)',
-            'line': {'color': '#10b981', 'width': 6, 'dash': 'dash'}
-        })
-        
-        # Traces for Obstacles
-        for i, obs in enumerate(clusters_3d):
+        # Prepare cluster points for Three.js
+        obs_data = []
+        for obs in clusters_3d:
             pts = np.array(obs['points'])
-            traces.append({
-                'x': pts[:, 0].tolist(), 'y': pts[:, 1].tolist(), 'z': pts[:, 2].tolist(),
-                'mode': 'markers', 'type': 'scatter3d', 'name': obs['type'],
-                'marker': {'size': 5, 'color': obs['color'], 'opacity': 0.75}
+            obs_data.append({
+                'type': obs['type'],
+                'color': obs['color'],
+                'points': pts.tolist()
             })
-            
-        # Trace for Walking Human Target (Index: len(traces))
-        walking_idx = len(traces)
-        traces.append({
-            'x': [-1.5], 'y': [-1.0], 'z': [0.8],
-            'mode': 'markers+text', 'type': 'scatter3d', 'name': 'Dynamic Walking Target',
-            'text': ['Walking (0.8 m/s)'], 'textposition': 'top center',
-            'marker': {'size': 14, 'color': '#f59e0b', 'symbol': 'circle'}
-        })
-        
-        # Trace for Stationary Vital Sign Subject (Index: len(traces))
-        vital_idx = len(traces)
-        traces.append({
-            'x': [1.0], 'y': [-1.0], 'z': [0.8],
-            'mode': 'markers+text', 'type': 'scatter3d', 'name': 'Vital Sign Subject',
-            'text': ['Breathing: 12 BPM | Heart: 80 BPM'], 'textposition': 'top center',
-            'marker': {'size': 14, 'color': '#ec4899', 'symbol': 'circle', 'opacity': 1.0}
-        })
-        
-        # Trace for Expanding RF Electromagnetic Pulse Wavefront (Index: len(traces))
-        pulse_idx = len(traces)
-        traces.append({
-            'x': [tx_pos[0]], 'y': [tx_pos[1]], 'z': [tx_pos[2]],
-            'mode': 'markers', 'type': 'scatter3d', 'name': 'RF Wavefront Pulse (100 Hz)',
-            'marker': {'size': 8, 'color': '#06b6d4', 'opacity': 0.6, 'symbol': 'circle-open'}
-        })
             
         html_content = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>WiFiVision Real-Time 3D Bistatic Pulse Engine & Vital Sign Telemetry</title>
-    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <title>WiFiVision Real-Time 3D Bistatic Pulse Engine (Three.js & Chart.js)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         body {{ font-family: 'Inter', system-ui, sans-serif; background-color: #0b0f19; color: #f3f4f6; margin: 0; padding: 16px; }}
-        .header {{ text-align: center; margin-bottom: 16px; }}
+        .header {{ text-align: center; margin-bottom: 12px; }}
         .header h1 {{ margin: 0; font-size: 1.8rem; background: linear-gradient(to right, #60a5fa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
         .header p {{ margin: 4px 0 0 0; color: #9ca3af; font-size: 0.95rem; }}
-        .specs-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }}
+        
+        .specs-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }}
         .spec-card {{ background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6; }}
         .spec-card.tx {{ border-left-color: #ef4444; }}
         .spec-card.rx {{ border-left-color: #3b82f6; }}
@@ -597,20 +553,34 @@ class RoomCSISimulator:
         .spec-title {{ font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; font-weight: 600; }}
         .spec-value {{ font-size: 1.1rem; font-weight: 700; margin-top: 4px; color: #ffffff; }}
         .spec-sub {{ font-size: 0.8rem; color: #6b7280; margin-top: 2px; }}
-        .controls {{ display: flex; justify-content: center; gap: 12px; margin-bottom: 16px; align-items: center; }}
-        .btn {{ background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }}
+        
+        .controls {{ display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: center; background: #111827; padding: 10px; border-radius: 8px; border: 1px solid #1f2937; }}
+        .btn {{ background: #3b82f6; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }}
         .btn:hover {{ background: #2563eb; }}
         .btn.paused {{ background: #ef4444; }}
-        .layout-main {{ display: grid; grid-template-columns: 2fr 1fr; gap: 16px; height: 72vh; }}
-        #plot3d {{ width: 100%; height: 100%; border-radius: 12px; background: #111827; border: 1px solid #1f2937; }}
-        .charts-panel {{ display: flex; flex-direction: column; gap: 12px; height: 100%; }}
-        .chart-box {{ flex: 1; background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 8px; }}
+        .btn-info {{ background: #10b981; }}
+        .btn-info:hover {{ background: #059669; }}
+        
+        .toggle-label {{ display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; background: #1f2937; padding: 6px 10px; border-radius: 6px; border: 1px solid #374151; cursor: pointer; user-select: none; }}
+        .toggle-label input {{ cursor: pointer; accent-color: #3b82f6; width: 16px; height: 16px; }}
+        
+        .details-panel {{ display: none; background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }}
+        .details-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
+        .device-table {{ width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.85rem; }}
+        .device-table th, .device-table td {{ text-align: left; padding: 6px 8px; border-bottom: 1px solid #374151; }}
+        .device-table th {{ color: #9ca3af; font-weight: 600; width: 40%; }}
+        .device-table td {{ color: #ffffff; font-weight: 500; font-family: monospace; }}
+        
+        .layout-main {{ display: grid; grid-template-columns: 2fr 1fr; gap: 16px; height: 68vh; }}
+        #container3d {{ width: 100%; height: 100%; border-radius: 12px; background: #111827; border: 1px solid #1f2937; overflow: hidden; position: relative; }}
+        .charts-panel {{ display: flex; flex-direction: column; gap: 10px; height: 100%; }}
+        .chart-box {{ flex: 1; background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 8px; position: relative; }}
     </style>
 </head>
 <body>
     <div class="header">
         <h1>WiFiVision Real-Time 3D Bistatic Pulse Engine</h1>
-        <p>Live RF electromagnetic pulse propagation, Doppler walking trajectory tracking, and non-invasive vital sign telemetry.</p>
+        <p>Powered by Three.js WebGL & Chart.js — Live RF pulse propagation, connected device telemetry, and room geometry.</p>
     </div>
     
     <div class="specs-grid">
@@ -620,16 +590,16 @@ class RoomCSISimulator:
             <div class="spec-sub">Pos: (3.5, 4.0, 2.5m) | 80 MHz BW | 100 Hz PRF</div>
         </div>
         <div class="spec-card rx">
-            <div class="spec-title">💻 Receiver (RX Client)</div>
+            <div class="spec-title">💻 Receiver (RX Client Node)</div>
             <div class="spec-value">Intel AX210 3-Elem ULA</div>
             <div class="spec-sub">Pos: (0.0, 0.0, 1.0m) | SNR: 34.2 dB | CFO Lock: ON</div>
         </div>
-        <div class="spec-card walk">
+        <div class="spec-card walk" id="cardWalk">
             <div class="spec-title">🚶 Doppler Target (Walking)</div>
             <div class="spec-value" id="valWalkPos">Pos: (-1.5, -1.0, 0.8m)</div>
             <div class="spec-sub">Speed: 0.8 m/s | Doppler: <span id="valDoppler">+27.7 Hz</span></div>
         </div>
-        <div class="spec-card vital">
+        <div class="spec-card vital" id="cardVital">
             <div class="spec-title">🫀 Vital Sign Subject</div>
             <div class="spec-value">Resp: 12.0 BPM | Heart: 80.0 BPM</div>
             <div class="spec-sub" id="valVitalStatus">Chest Exp: +0.00 mm | Pulse: Normal</div>
@@ -638,21 +608,77 @@ class RoomCSISimulator:
     
     <div class="controls">
         <button class="btn" id="btnToggle" onclick="togglePlay()">⏸ Pause Pulse Loop</button>
-        <span style="font-size: 0.9rem; color: #9ca3af;">Pulse Speed:</span>
+        <button class="btn btn-info" onclick="toggleDetails()">📋 Connected Device Specs</button>
+        
+        <span style="color: #4b5563;">|</span>
+        
+        <label class="toggle-label" style="border-color: #f59e0b; color: #fbbf24;">
+            <input type="checkbox" id="chkWalk" checked onchange="toggleFeature('walk', this.checked)">
+            🚶 Walking Target
+        </label>
+        <label class="toggle-label" style="border-color: #ec4899; color: #f472b6;">
+            <input type="checkbox" id="chkVital" checked onchange="toggleFeature('vital', this.checked)">
+            🫀 Vital Sign Subject
+        </label>
+        <label class="toggle-label" style="border-color: #06b6d4; color: #22d3ee;">
+            <input type="checkbox" id="chkPulse" checked onchange="toggleFeature('pulse', this.checked)">
+            📡 RF Wavefronts
+        </label>
+        <label class="toggle-label" style="border-color: #9ca3af; color: #d1d5db;">
+            <input type="checkbox" id="chkObs" checked onchange="toggleFeature('obs', this.checked)">
+            🧱 Room Obstacles
+        </label>
+        
+        <span style="color: #4b5563;">|</span>
         <select id="selSpeed" style="background: #1f2937; color: white; border: 1px solid #374151; padding: 6px; border-radius: 6px;" onchange="changeSpeed(this.value)">
-            <option value="0.5">0.5x (Slow RF Motion)</option>
-            <option value="1.0" selected>1.0x (Real-Time 100 Hz)</option>
-            <option value="2.0">2.0x (Fast Simulation)</option>
+            <option value="0.5">0.5x Speed</option>
+            <option value="1.0" selected>1.0x Speed (100 Hz)</option>
+            <option value="2.0">2.0x Speed</option>
         </select>
-        <span style="font-size: 0.9rem; color: #10b981; font-weight: 600;">● LIVE RF TELEMETRY STREAMING</span>
+    </div>
+    
+    <div class="details-panel" id="detailsPanel">
+        <h3 style="margin: 0 0 12px 0; color: #34d399; font-size: 1.1rem;">⚡ Connected RF Network Device & PHY-Layer Specifications</h3>
+        <div class="details-grid">
+            <div style="background: #111827; padding: 12px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                <h4 style="margin: 0; color: #f87171;">📡 Transmitter (Sender Router AP)</h4>
+                <table class="device-table">
+                    <tr><th>Hardware Model</th><td>ASUS ROG Rapture GT-AX11000 Pro / Wi-Fi 6E AP</td></tr>
+                    <tr><th>MAC / IP Address</th><td>00:90:4C:C5:12:38  |  192.168.1.1</td></tr>
+                    <tr><th>Operating Standard</th><td>IEEE 802.11ax (Wi-Fi 6E) / 802.11ac</td></tr>
+                    <tr><th>RF Band & Channel</th><td>UNII-1 Band, Channel 40 (Center Freq: 5200 MHz)</td></tr>
+                    <tr><th>Channel Bandwidth</th><td>80 MHz Wideband (114 total subcarriers)</td></tr>
+                    <tr><th>CSI Extraction Bins</th><td>56 Pilot & Data Subcarriers (I/Q Complex Matrix)</td></tr>
+                    <tr><th>MIMO Array Config</th><td>4x4 MU-MIMO Spatial Array (+5 dBi Omnidirectional)</td></tr>
+                    <tr><th>Transmit Power (EIRP)</th><td>+23.0 dBm (200 mW Isotropic Radiated Power)</td></tr>
+                    <tr><th>Modulation & MCS</th><td>MCS 9 (256-QAM Modulation, 5/6 Coding Rate)</td></tr>
+                    <tr><th>Packet Rate (PRF)</th><td>100 Hz Sounding PPDU Frames (10 ms Interval)</td></tr>
+                </table>
+            </div>
+            <div style="background: #111827; padding: 12px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                <h4 style="margin: 0; color: #60a5fa;">💻 Receiver (Client Monitoring Sensor Node)</h4>
+                <table class="device-table">
+                    <tr><th>Hardware Model</th><td>Intel Wi-Fi 6E AX210 / Atheros 5300 CSI Extender Node</td></tr>
+                    <tr><th>MAC / IP Address</th><td>8C:8D:28:4B:91:A2  |  192.168.1.105 (Monitor Mode)</td></tr>
+                    <tr><th>Kernel Driver</th><td>Modified Linux CSI Extraction Patch (iwconfig wlan0)</td></tr>
+                    <tr><th>Antenna Array Setup</th><td>3-Element Uniform Linear Array (d = 2.88 cm half-wave)</td></tr>
+                    <tr><th>Signal Strength (RSSI)</th><td>-48.0 dBm (Direct Line-of-Sight Strong Beam)</td></tr>
+                    <tr><th>SNR & Noise Floor</th><td>SNR: 34.2 dB  |  Base Noise Floor: -82.2 dBm</td></tr>
+                    <tr><th>CFO/SFO Sanitization</th><td>Active Least-Squares Linear Regression Phase Unwrapping</td></tr>
+                    <tr><th>AGC Phase Distortion</th><td>0.00% (4th-Order Zero-Phase Butterworth Low-Pass Filter)</td></tr>
+                    <tr><th>Time-of-Flight Res</th><td>Sub-nanosecond Super-Resolution MUSIC Array (0.1 ns)</td></tr>
+                    <tr><th>Packet Reception Rate</th><td>100.0% (0 dropped frames out of 1,000 Sounding PPDUs)</td></tr>
+                </table>
+            </div>
+        </div>
     </div>
     
     <div class="layout-main">
-        <div id="plot3d"></div>
+        <div id="container3d"></div>
         <div class="charts-panel">
-            <div id="chartResp" class="chart-box"></div>
-            <div id="chartHeart" class="chart-box"></div>
-            <div id="chartDoppler" class="chart-box"></div>
+            <div class="chart-box"><canvas id="canvasResp"></canvas></div>
+            <div class="chart-box"><canvas id="canvasHeart"></canvas></div>
+            <div class="chart-box"><canvas id="canvasDoppler"></canvas></div>
         </div>
     </div>
 
@@ -661,48 +687,140 @@ class RoomCSISimulator:
         var simSpeed = 1.0;
         var startTime = Date.now();
         var txPos = [{tx_pos[0]}, {tx_pos[1]}, {tx_pos[2]}];
+        var rxPos = [{rx_pos[0]}, {rx_pos[1]}, {rx_pos[2]}];
+        var obsData = {json.dumps(obs_data)};
         
-        // Initial 3D Plot
-        var traces3d = {json.dumps(traces)};
-        var layout3d = {{
-            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-            font: {{ color: '#e5e7eb' }},
-            margin: {{ l: 0, r: 0, b: 0, t: 10 }},
-            scene: {{
-                xaxis: {{ title: 'X Distance (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [-2.5, 4.5] }},
-                yaxis: {{ title: 'Y Distance (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [-2.5, 4.5] }},
-                zaxis: {{ title: 'Z Height (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [0, 3.5] }},
-                camera: {{ eye: {{ x: 1.4, y: -1.6, z: 1.1 }} }}
-            }},
-            showlegend: false
-        }};
-        Plotly.newPlot('plot3d', traces3d, layout3d, {{responsive: true}});
+        // --- 1. THREE.JS 3D WEBGL ENGINE SETUP ---
+        var container = document.getElementById('container3d');
+        var scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111827);
         
-        // Initial 2D Telemetry Charts
-        var tData = [], respData = [], heartData = [], dopplerData = [];
-        for(var i=0; i<50; i++) {{
-            tData.push(i * 0.1);
-            respData.push(Math.sin(2 * Math.PI * 0.2 * i * 0.1));
-            heartData.push(Math.sin(2 * Math.PI * 1.33 * i * 0.1));
-            dopplerData.push(27.7);
+        var camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+        camera.position.set(4.0, -5.0, 4.5);
+        camera.up.set(0, 0, 1); // Z is UP
+        
+        var renderer = new THREE.WebGLRenderer({{ antialias: true }});
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+        
+        var controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0.5, 0.5, 1.0);
+        controls.update();
+        
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        var light = new THREE.DirectionalLight(0xffffff, 0.8);
+        light.position.set(5, -5, 8);
+        scene.add(light);
+        
+        // Floor Grid (10m x 10m)
+        var grid = new THREE.GridHelper(10, 20, 0x374151, 0x1f2937);
+        grid.rotation.x = Math.PI / 2;
+        scene.add(grid);
+        
+        // TX Router AP Sphere (#ef4444)
+        var txGeo = new THREE.SphereGeometry(0.2, 32, 32);
+        var txMat = new THREE.MeshStandardMaterial({{ color: 0xef4444, emissive: 0x7f1d1d }});
+        var txMesh = new THREE.Mesh(txGeo, txMat);
+        txMesh.position.set(txPos[0], txPos[1], txPos[2]);
+        scene.add(txMesh);
+        
+        // RX Client Octahedron/Diamond (#3b82f6)
+        var rxGeo = new THREE.OctahedronGeometry(0.2, 0);
+        var rxMat = new THREE.MeshStandardMaterial({{ color: 0x3b82f6, emissive: 0x1e3a8a }});
+        var rxMesh = new THREE.Mesh(rxGeo, rxMat);
+        rxMesh.position.set(rxPos[0], rxPos[1], rxPos[2]);
+        scene.add(rxMesh);
+        
+        // Direct LoS Beam (Dashed Line)
+        var losPts = [new THREE.Vector3(txPos[0], txPos[1], txPos[2]), new THREE.Vector3(rxPos[0], rxPos[1], rxPos[2])];
+        var losGeo = new THREE.BufferGeometry().setFromPoints(losPts);
+        var losMat = new THREE.LineDashedMaterial({{ color: 0x10b981, dashSize: 0.2, gapSize: 0.1, linewidth: 2 }});
+        var losLine = new THREE.Line(losGeo, losMat);
+        losLine.computeLineDistances();
+        scene.add(losLine);
+        
+        // Obstacles Group
+        var obsGroup = new THREE.Group();
+        obsData.forEach(obs => {{
+            var colHex = parseInt(obs.color.replace('#', '0x'));
+            var obsMat = new THREE.MeshStandardMaterial({{ color: colHex, roughness: 0.7, transparent: true, opacity: 0.85 }});
+            obs.points.forEach(p => {{
+                var pGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+                var pMesh = new THREE.Mesh(pGeo, obsMat);
+                pMesh.position.set(p[0], p[1], p[2]);
+                obsGroup.add(pMesh);
+            }});
+        }});
+        scene.add(obsGroup);
+        
+        // Walking Human Target Sphere (#f59e0b)
+        var walkGeo = new THREE.SphereGeometry(0.25, 32, 32);
+        var walkMat = new THREE.MeshStandardMaterial({{ color: 0xf59e0b, emissive: 0x92400e }});
+        var walkMesh = new THREE.Mesh(walkGeo, walkMat);
+        walkMesh.position.set(-1.5, -1.0, 0.8);
+        scene.add(walkMesh);
+        
+        // Vital Sign Subject Sphere (#ec4899)
+        var vitalGeo = new THREE.SphereGeometry(0.25, 32, 32);
+        var vitalMat = new THREE.MeshStandardMaterial({{ color: 0xec4899, emissive: 0x831843 }});
+        var vitalMesh = new THREE.Mesh(vitalGeo, vitalMat);
+        vitalMesh.position.set(1.0, -1.0, 0.8);
+        scene.add(vitalMesh);
+        
+        // Expanding RF Pulse Ring Wavefronts (#06b6d4)
+        var pulseGroup = new THREE.Group();
+        var numRings = 3;
+        for(var r=0; r<numRings; r++) {{
+            var ringGeo = new THREE.RingGeometry(0.1, 0.15, 64);
+            var ringMat = new THREE.MeshBasicMaterial({{ color: 0x06b6d4, side: THREE.DoubleSide, transparent: true, opacity: 0.6 }});
+            var ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.position.set(txPos[0], txPos[1], txPos[2]);
+            ringMesh.userData = {{ offset: r * 2.0 }};
+            pulseGroup.add(ringMesh);
+        }}
+        scene.add(pulseGroup);
+        
+        window.addEventListener('resize', function() {{
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }});
+        
+        // --- 2. CHART.JS 2D TELEMETRY GRAPHS SETUP ---
+        var timeLabels = [];
+        var dataResp = [], dataHeart = [], dataDoppler = [];
+        for(var i=0; i<40; i++) {{
+            timeLabels.push((i * 0.1).toFixed(1));
+            dataResp.push(0);
+            dataHeart.push(0);
+            dataDoppler.push(27.7);
         }}
         
-        var layoutChart = function(title, ytitle, color) {{
+        var chartConfig = function(label, colHex, dataArr, yMin, yMax) {{
             return {{
-                title: {{ text: title, font: {{ size: 12, color: '#9ca3af' }}, x: 0.05, y: 0.9 }},
-                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-                font: {{ color: '#9ca3af', size: 10 }},
-                margin: {{ l: 40, r: 10, b: 25, t: 25 }},
-                xaxis: {{ title: 'Time (s)', gridcolor: '#1f2937' }},
-                yaxis: {{ title: ytitle, gridcolor: '#1f2937', zerolinecolor: '#374151' }},
-                showlegend: false
+                type: 'line',
+                data: {{
+                    labels: timeLabels,
+                    datasets: [{{ label: label, data: dataArr, borderColor: colHex, borderWidth: 2, pointRadius: 0, tension: 0.4 }}]
+                }},
+                options: {{
+                    responsive: true, maintainAspectRatio: false, animation: false,
+                    plugins: {{ legend: {{ display: true, labels: {{ color: '#9ca3af', font: {{ size: 11 }} }} }} }},
+                    scales: {{
+                        x: {{ grid: {{ color: '#1f2937' }}, ticks: {{ color: '#6b7280', maxTicksLimit: 6 }} }},
+                        y: {{ min: yMin, max: yMax, grid: {{ color: '#1f2937' }}, ticks: {{ color: '#6b7280' }} }}
+                    }}
+                }}
             }};
         }};
         
-        Plotly.newPlot('chartResp', [{{ x: tData, y: respData, mode: 'lines', line: {{ color: '#ec4899', width: 2.5 }} }}], layoutChart('Respiration Waveform (12 BPM)', 'Amp (mm)', '#ec4899'), {{responsive: true, displayModeBar: false}});
-        Plotly.newPlot('chartHeart', [{{ x: tData, y: heartData, mode: 'lines', line: {{ color: '#ef4444', width: 2 }} }}], layoutChart('Heartbeat Pulse Wave (80 BPM)', 'Phase (rad)', '#ef4444'), {{responsive: true, displayModeBar: false}});
-        Plotly.newPlot('chartDoppler', [{{ x: tData, y: dopplerData, mode: 'lines', line: {{ color: '#f59e0b', width: 2 }} }}], layoutChart('Doppler Walking Shift', 'Freq (Hz)', '#f59e0b'), {{responsive: true, displayModeBar: false}});
-
+        var chartResp = new Chart(document.getElementById('canvasResp'), chartConfig('Respiration Wave (12 BPM) - mm', '#ec4899', dataResp, -3, 3));
+        var chartHeart = new Chart(document.getElementById('canvasHeart'), chartConfig('Heartbeat Pulse (80 BPM) - rad', '#ef4444', dataHeart, -1.5, 1.5));
+        var chartDoppler = new Chart(document.getElementById('canvasDoppler'), chartConfig('Doppler Walking Shift - Hz', '#f59e0b', dataDoppler, -35, 35));
+        
+        // --- 3. INTERACTIVE CONTROLS & ANIMATION LOOP ---
         function togglePlay() {{
             isPlaying = !isPlaying;
             var btn = document.getElementById('btnToggle');
@@ -710,62 +828,98 @@ class RoomCSISimulator:
             else {{ btn.innerText = "▶ Resume Pulse Loop"; btn.classList.add('paused'); }}
         }}
         
+        function toggleDetails() {{
+            var panel = document.getElementById('detailsPanel');
+            panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+        }}
+        
+        function toggleFeature(feat, isChecked) {{
+            if(feat === 'walk') {{
+                walkMesh.visible = isChecked;
+                document.getElementById('cardWalk').style.opacity = isChecked ? '1.0' : '0.3';
+                document.getElementById('canvasDoppler').parentElement.style.display = isChecked ? 'block' : 'none';
+            }} else if(feat === 'vital') {{
+                vitalMesh.visible = isChecked;
+                document.getElementById('cardVital').style.opacity = isChecked ? '1.0' : '0.3';
+                document.getElementById('canvasResp').parentElement.style.display = isChecked ? 'block' : 'none';
+                document.getElementById('canvasHeart').parentElement.style.display = isChecked ? 'block' : 'none';
+            }} else if(feat === 'pulse') {{
+                pulseGroup.visible = isChecked;
+            }} else if(feat === 'obs') {{
+                obsGroup.visible = isChecked;
+            }}
+        }}
+        
         function changeSpeed(val) {{ simSpeed = parseFloat(val); }}
-
-        // Animation Loop
-        var lastTime = 0;
-        function updateSimulation() {{
+        
+        var lastChartTime = 0;
+        function animate() {{
+            requestAnimationFrame(animate);
+            controls.update();
+            
             if(isPlaying) {{
                 var t = (Date.now() - startTime) * 0.001 * simSpeed;
                 
-                // 1. Calculate Walking Target Trajectory
-                var cycle = (t % 10.0) / 10.0; // 10 sec loop
-                var wx = -1.5 + 3.0 * (Math.sin(cycle * 2 * Math.PI) * 0.5 + 0.5);
-                var wy = -1.0 + 2.0 * (Math.sin(cycle * 2 * Math.PI) * 0.5 + 0.5);
-                var wz = 0.8;
-                var velX = 3.0 * Math.PI * 0.1 * Math.cos(cycle * 2 * Math.PI);
-                var curDoppler = Math.round((velX * 5200 * 2 / 300) * 10) / 10;
-                
-                document.getElementById('valWalkPos').innerText = `Pos: (${{wx.toFixed(1)}}, ${{wy.toFixed(1)}}, ${{wz.toFixed(1)}}m)`;
-                document.getElementById('valDoppler').innerText = `${{curDoppler >= 0 ? '+' : ''}}${{curDoppler}} Hz`;
+                // 1. Walking Target Trajectory
+                var walkActive = document.getElementById('chkWalk').checked;
+                var curDoppler = 0;
+                if(walkActive) {{
+                    var cycle = (t % 10.0) / 10.0;
+                    var wx = -1.5 + 3.0 * (Math.sin(cycle * 2 * Math.PI) * 0.5 + 0.5);
+                    var wy = -1.0 + 2.0 * (Math.sin(cycle * 2 * Math.PI) * 0.5 + 0.5);
+                    walkMesh.position.set(wx, wy, 0.8);
+                    
+                    var velX = 3.0 * Math.PI * 0.1 * Math.cos(cycle * 2 * Math.PI);
+                    curDoppler = Math.round((velX * 5200 * 2 / 300) * 10) / 10;
+                    document.getElementById('valWalkPos').innerText = `Pos: (${{wx.toFixed(1)}}, ${{wy.toFixed(1)}}, 0.8m)`;
+                    document.getElementById('valDoppler').innerText = `${{curDoppler >= 0 ? '+' : ''}}${{curDoppler}} Hz`;
+                }}
                 
                 // 2. Vital Sign Pulsing
-                var respPulse = Math.sin(2 * Math.PI * 0.2 * t);
-                var heartPulse = Math.sin(2 * Math.PI * 1.33 * t);
-                var chestMm = (respPulse * 2.5).toFixed(2);
-                document.getElementById('valVitalStatus').innerText = `Chest Exp: ${{chestMm >= 0 ? '+' : ''}}${{chestMm}} mm | Pulse: Active`;
-                
-                // 3. Expanding RF Electromagnetic Wavefront Pulses (Concentric ring points emitting from TX)
-                var pulseRadius = (t * 4.0) % 6.0; // Expanding speed 4 m/s up to 6m
-                var numPts = 36;
-                var px = [], py = [], pz = [];
-                for(var p=0; p<numPts; p++) {{
-                    var angle = (p / numPts) * 2 * Math.PI;
-                    px.push(txPos[0] + pulseRadius * Math.cos(angle));
-                    py.push(txPos[1] + pulseRadius * Math.sin(angle));
-                    pz.push(txPos[2] - pulseRadius * 0.3 * (Math.sin(angle*2)*0.2 + 0.8)); // angle downward towards room
+                var vitalActive = document.getElementById('chkVital').checked;
+                var respVal = 0, heartVal = 0;
+                if(vitalActive) {{
+                    respVal = Math.sin(2 * Math.PI * 0.2 * t);
+                    heartVal = Math.sin(2 * Math.PI * 1.33 * t);
+                    vitalMesh.scale.set(1.0 + respVal*0.3, 1.0 + respVal*0.3, 1.0 + respVal*0.3);
+                    var chestMm = (respVal * 2.5).toFixed(2);
+                    document.getElementById('valVitalStatus').innerText = `Chest Exp: ${{chestMm >= 0 ? '+' : ''}}${{chestMm}} mm | Pulse: Active`;
                 }}
                 
-                // Update 3D Traces ({walking_idx}, {vital_idx}, {pulse_idx})
-                Plotly.restyle('plot3d', {{
-                    'x': [[wx], [1.0], px],
-                    'y': [[wy], [-1.0], py],
-                    'z': [[wz], [0.8 + respPulse * 0.05], pz],
-                    'marker.size': [[14], [14 + respPulse * 4], [8]],
-                    'marker.opacity': [[1.0], [0.85 + heartPulse * 0.15], [Math.max(0, 0.8 - pulseRadius/6.0)]]
-                }}, [{walking_idx}, {vital_idx}, {pulse_idx}]);
+                // 3. Expanding RF Pulse Rings
+                if(pulseGroup.visible) {{
+                    pulseGroup.children.forEach(ring => {{
+                        var rad = ((t * 3.0 + ring.userData.offset) % 6.0);
+                        ring.scale.set(rad * 4, rad * 4, rad * 4);
+                        ring.position.set(txPos[0], txPos[1], txPos[2] - rad * 0.3);
+                        ring.material.opacity = Math.max(0, 0.7 - rad / 6.0);
+                    }});
+                }}
                 
-                // 4. Update Telemetry Charts every ~200ms
-                if(t - lastTime > 0.15) {{
-                    lastTime = t;
-                    Plotly.extendTraces('chartResp', {{ x: [[t]], y: [[respPulse * 2.5]] }}, [0], 60);
-                    Plotly.extendTraces('chartHeart', {{ x: [[t]], y: [[heartPulse]] }}, [0], 60);
-                    Plotly.extendTraces('chartDoppler', {{ x: [[t]], y: [[curDoppler]] }}, [0], 60);
+                // 4. Update Chart.js every ~150ms
+                if(t - lastChartTime > 0.15) {{
+                    lastChartTime = t;
+                    var timeStr = t.toFixed(1);
+                    if(vitalActive) {{
+                        chartResp.data.labels.shift(); chartResp.data.labels.push(timeStr);
+                        chartResp.data.datasets[0].data.shift(); chartResp.data.datasets[0].data.push(respVal * 2.5);
+                        chartResp.update('none');
+                        
+                        chartHeart.data.labels.shift(); chartHeart.data.labels.push(timeStr);
+                        chartHeart.data.datasets[0].data.shift(); chartHeart.data.datasets[0].data.push(heartVal);
+                        chartHeart.update('none');
+                    }}
+                    if(walkActive) {{
+                        chartDoppler.data.labels.shift(); chartDoppler.data.labels.push(timeStr);
+                        chartDoppler.data.datasets[0].data.shift(); chartDoppler.data.datasets[0].data.push(curDoppler);
+                        chartDoppler.update('none');
+                    }}
                 }}
             }}
-            requestAnimationFrame(updateSimulation);
+            
+            renderer.render(scene, camera);
         }}
-        requestAnimationFrame(updateSimulation);
+        animate();
     </script>
 </body>
 </html>"""
