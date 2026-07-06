@@ -2,35 +2,191 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>3D Bistatic Wi-Fi Spatial Reconstruction Map</title>
+    <title>WiFiVision Real-Time 3D Bistatic Pulse Engine & Vital Sign Telemetry</title>
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #111827; color: #f9fafb; margin: 0; padding: 20px; }
-        .header { text-align: center; margin-bottom: 20px; }
-        #plotDiv { width: 100%; height: 82vh; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #1f2937; }
+        body { font-family: 'Inter', system-ui, sans-serif; background-color: #0b0f19; color: #f3f4f6; margin: 0; padding: 16px; }
+        .header { text-align: center; margin-bottom: 16px; }
+        .header h1 { margin: 0; font-size: 1.8rem; background: linear-gradient(to right, #60a5fa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header p { margin: 4px 0 0 0; color: #9ca3af; font-size: 0.95rem; }
+        .specs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+        .spec-card { background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6; }
+        .spec-card.tx { border-left-color: #ef4444; }
+        .spec-card.rx { border-left-color: #3b82f6; }
+        .spec-card.walk { border-left-color: #f59e0b; }
+        .spec-card.vital { border-left-color: #ec4899; }
+        .spec-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; font-weight: 600; }
+        .spec-value { font-size: 1.1rem; font-weight: 700; margin-top: 4px; color: #ffffff; }
+        .spec-sub { font-size: 0.8rem; color: #6b7280; margin-top: 2px; }
+        .controls { display: flex; justify-content: center; gap: 12px; margin-bottom: 16px; align-items: center; }
+        .btn { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .btn:hover { background: #2563eb; }
+        .btn.paused { background: #ef4444; }
+        .layout-main { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; height: 72vh; }
+        #plot3d { width: 100%; height: 100%; border-radius: 12px; background: #111827; border: 1px solid #1f2937; }
+        .charts-panel { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+        .chart-box { flex: 1; background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 8px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>3D Bistatic Wi-Fi Spatial Reconstruction Engine</h1>
-        <p>Interactive 3D geometry mapping between Router (Sender), Client (Receiver), and physical room obstacles.</p>
+        <h1>WiFiVision Real-Time 3D Bistatic Pulse Engine</h1>
+        <p>Live RF electromagnetic pulse propagation, Doppler walking trajectory tracking, and non-invasive vital sign telemetry.</p>
     </div>
-    <div id="plotDiv"></div>
+    
+    <div class="specs-grid">
+        <div class="spec-card tx">
+            <div class="spec-title">📡 Sender (TX Router AP)</div>
+            <div class="spec-value">ASUS ROG AP (5.200 GHz)</div>
+            <div class="spec-sub">Pos: (3.5, 4.0, 2.5m) | 80 MHz BW | 100 Hz PRF</div>
+        </div>
+        <div class="spec-card rx">
+            <div class="spec-title">💻 Receiver (RX Client)</div>
+            <div class="spec-value">Intel AX210 3-Elem ULA</div>
+            <div class="spec-sub">Pos: (0.0, 0.0, 1.0m) | SNR: 34.2 dB | CFO Lock: ON</div>
+        </div>
+        <div class="spec-card walk">
+            <div class="spec-title">🚶 Doppler Target (Walking)</div>
+            <div class="spec-value" id="valWalkPos">Pos: (-1.5, -1.0, 0.8m)</div>
+            <div class="spec-sub">Speed: 0.8 m/s | Doppler: <span id="valDoppler">+27.7 Hz</span></div>
+        </div>
+        <div class="spec-card vital">
+            <div class="spec-title">🫀 Vital Sign Subject</div>
+            <div class="spec-value">Resp: 12.0 BPM | Heart: 80.0 BPM</div>
+            <div class="spec-sub" id="valVitalStatus">Chest Exp: +0.00 mm | Pulse: Normal</div>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" id="btnToggle" onclick="togglePlay()">⏸ Pause Pulse Loop</button>
+        <span style="font-size: 0.9rem; color: #9ca3af;">Pulse Speed:</span>
+        <select id="selSpeed" style="background: #1f2937; color: white; border: 1px solid #374151; padding: 6px; border-radius: 6px;" onchange="changeSpeed(this.value)">
+            <option value="0.5">0.5x (Slow RF Motion)</option>
+            <option value="1.0" selected>1.0x (Real-Time 100 Hz)</option>
+            <option value="2.0">2.0x (Fast Simulation)</option>
+        </select>
+        <span style="font-size: 0.9rem; color: #10b981; font-weight: 600;">● LIVE RF TELEMETRY STREAMING</span>
+    </div>
+    
+    <div class="layout-main">
+        <div id="plot3d"></div>
+        <div class="charts-panel">
+            <div id="chartResp" class="chart-box"></div>
+            <div id="chartHeart" class="chart-box"></div>
+            <div id="chartDoppler" class="chart-box"></div>
+        </div>
+    </div>
+
     <script>
-        var data = [{"x": [3.5], "y": [4.0], "z": [2.5], "mode": "markers+text", "type": "scatter3d", "name": "Sender (Router TX)", "text": ["Router TX (3.5, 4.0, 2.5m)"], "textposition": "top center", "marker": {"size": 10, "color": "#e41a1c", "symbol": "circle"}}, {"x": [0.0], "y": [0.0], "z": [1.0], "mode": "markers+text", "type": "scatter3d", "name": "Receiver (Client RX)", "text": ["Client RX (0.0, 0.0, 1.0m)"], "textposition": "top center", "marker": {"size": 10, "color": "#377eb8", "symbol": "diamond"}}, {"x": [3.5, 0.0], "y": [4.0, 0.0], "z": [2.5, 1.0], "mode": "lines", "type": "scatter3d", "name": "Direct LoS Beam", "line": {"color": "#4daf4a", "width": 5, "dash": "dash"}}, {"x": [1.517143321699056, 1.9191119469344573, 1.5826885628679248, 1.4734650582660687, 1.8040380166604268, 1.6839816224531363, 1.7080787876403885, 1.7561572851516778, 1.9150838720009664, 1.7351501876259905, 1.9558702866501845, 1.6987073193227868, 1.990844199746485, 1.9272433196302587, 1.7998256186467194, 1.6925210370861374, 1.8643340573914324, 1.9431047932942032, 1.8826705697004007, 1.9329463929460753, 1.7734409707797014, 1.8080302351107131, 2.1876041867601814, 1.920544142437661, 1.7577772487386725, 1.6975180733509014, 1.7307574775860208, 1.8526513496733947, 1.8361614384239213, 2.037853132202193, 1.846090548838125, 1.7608142146440973, 1.8464955673297314, 1.1117396670106052, 2.8148490091564478, 2.4239984556480034, 2.3928703601832524, 2.523388037363259, 2.3213800378475833, 2.758947451910846, 2.1007749697688585, 2.533308346874833, 2.5760570545186887, 2.2717194824048295, 2.41822492766231, 2.2200040881720056, 2.274176034945482, 2.6759215021341447, 2.1196409363310096, 2.3226649339452945, 2.418887551682173, 2.201574637975811, 2.34610180852746, 2.653275865721489, 2.335446159464594, 2.473791034800032, 2.4890587202492025, 2.2973235780535544, 2.1730900809877243, 1.2924442928204032, 1.4639048617017458, 0.8651085803116444, 1.5007243399184762, 0.9549354596076537, 1.1941695084891375, 1.2484564142665933, 0.5916231462164696, 0.9723824635335944, 1.0129295659821416, 0.5175766244397635, 0.8609595092565885, 1.4272060185543998, 0.5853600510958419, 1.2657433819390558, 0.5935259190858404, 1.469660349432522, 1.417794607190078, 1.265542488723438, 0.7505546956878444, 1.9693799932106302, 1.4799127412736026, 2.1030825230240064, 2.3281071841992858, 1.6197353205082703, 2.543849397397778, 1.8619627103287062, 2.6453481967611796, 1.547367665330775, 1.4854776952387077, 1.671617295894158, 2.7926693997073344, 2.3859634312633453, 1.3259493762251315, 2.2354234607149506], "y": [1.196663546635376, 1.718673827002831, 1.6039891634234262, 1.9572845668512704, 0.5451806141946915, 3.0255439412085883, 1.6850126029406907, 2.555755686509349, 0.5851391819898493, 0.7879967236698638, 2.7281910769372337, 1.1887938576434314, 0.8540408282356184, 0.8512338795093104, 2.6062704147485607, 2.7318162022506285, 2.010924589997047, 1.8202861257171827, 1.9809707518567532, 3.4921502310523276, 0.8629970029514493, 1.136687786009397, 1.631603645332911, 3.111517595032376, 3.3610453210119586, 0.5522200640286204, 2.0368114969476445, 3.231557729338996, 3.4490141898232713, 1.5140947905268036, 3.298583967881603, 0.7055115868857537, 2.081573167614211, 1.0162294155876732, 1.0247905588399768, 1.1661247123200327, 1.2837613347891965, 1.0066197691586702, 1.2051873353105917, 1.28106972082203, 0.8703507576957359, 1.47062046390985, 0.8960854981302417, 0.9995675873875133, 1.1939213350422777, 1.3673740867986668, 1.0205613487168337, 1.333291078522556, 1.0181361563860085, 0.9312170161062753, 1.2745918858362573, 0.9565159967606053, 1.0678519811707163, 1.039446241752563, 1.13906672110241, 0.8642220532652882, 0.9880206928351709, 0.9920797611796137, 1.2369103091079707, 1.8940680188356098, 1.855550579817306, 1.1022771088188816, 1.666906479908403, 1.2902097094385887, 1.8311195595370942, 1.4658086750441375, 1.5831806626681584, 1.7160051833098864, 1.4501888515106074, 1.2873104097200794, 1.5745161154577758, 1.3664701694244856, 1.7270577853110185, 1.7713215860000608, 1.1077517863904052, 1.347853315812747, 1.3332370230408737, 1.6863438749308064, 1.3145393718281473, 1.8576993951513259, 1.9445452177314109, 2.142708759483149, 2.1633932851715048, 1.8539953020160098, 1.8309506903612118, 1.8580971166311713, 2.0101280914622177, 2.184823208628424, 1.9973272993679083, 2.2665294119913892, 2.1743425093680404, 2.294094318992993, 2.260867159854399, 2.196282546397049], "z": [1.6456401404748768, 2.450191373948339, 1.1510858384185534, 2.064276382706174, 0.6420570764309737, 1.0630792003932654, 0.6193775417280403, 0.4095976581140802, 0.6732847659833667, 2.4457818772487303, 2.4299846741403623, 0.808929441883794, 1.42104969995507, 0.7926049401316523, 1.1390930167549354, 2.5966645655335263, 0.40980695990373717, 2.525425919528539, 1.0265717689716902, 0.6960998679927259, 0.7596612599739537, 0.5614267872235607, 1.5683136497862837, 1.9656462062726048, 1.937682035111111, 2.5382016140267014, 0.9988892701377008, 1.41185661315188, 0.4708536947380686, 1.3860033931549647, 1.1103919397168602, 1.9122188000221911, 0.5637796342876065, 1.415433076283093, 2.205144494117923, 0.26977899649523807, 2.7530335768414664, 0.038303687809773224, 0.8744942150320572, 0.26738425497764606, 1.748736726922417, 1.5523042901107722, 0.12331625664302936, 2.474429058753654, 0.7338090815430207, 2.53085065683668, 1.5604446753752281, 2.363099530558416, 0.5390508165528438, 0.37178169563379204, 2.313930303609716, 1.0675291685769812, 2.5799964505793476, 3.0824214238913186, 1.5410837424169155, 1.4158160020269008, 1.4165747766408692, 1.4566051899783246, 1.1320456660502163, 0.9654968104287699, 0.9098516422909821, 1.014159687225968, 0.5651225565417272, 0.6298960607581621, 0.5456747264399167, 0.8867171744738584, 0.6726099933934133, 1.059472671238877, 0.9373246122451512, 0.6921563677009073, 0.8776040747736771, 0.5413112077288518, 0.8871709141317161, 0.522499283588985, 0.9285807474451157, 0.8485787986663589, 0.5582676996442386, 1.0731001416737493, 0.8960930591695974, 2.7833917579021357, 2.5547082913890087, 2.815081222001827, 2.8275964341394824, 2.7411377453505956, 2.6667304510940215, 2.5799711832286496, 2.7398555223097314, 2.846086860692585, 2.779825916336485, 2.7000072482589523, 2.6446169511075395, 2.6738021936261402, 2.756293527422493, 2.6581989690739345], "mode": "markers", "type": "scatter3d", "name": "Boundary Wall / Room Partition", "marker": {"size": 6, "color": "#2b5c8f", "opacity": 0.85}}];
-        var layout = {
-            paper_bgcolor: '#1f2937', plot_bgcolor: '#1f2937',
-            font: { color: '#f9fafb' },
-            margin: { l: 0, r: 0, b: 0, t: 30 },
+        var isPlaying = true;
+        var simSpeed = 1.0;
+        var startTime = Date.now();
+        var txPos = [3.5, 4.0, 2.5];
+        
+        // Initial 3D Plot
+        var traces3d = [{"x": [3.5], "y": [4.0], "z": [2.5], "mode": "markers+text", "type": "scatter3d", "name": "Sender (Router TX)", "text": ["ASUS ROG AP (3.5, 4.0, 2.5m)"], "textposition": "top center", "marker": {"size": 12, "color": "#ef4444", "symbol": "circle", "line": {"color": "#ffffff", "width": 2}}}, {"x": [0.0], "y": [0.0], "z": [1.0], "mode": "markers+text", "type": "scatter3d", "name": "Receiver (Client RX)", "text": ["Intel AX210 ULA (0.0, 0.0, 1.0m)"], "textposition": "top center", "marker": {"size": 12, "color": "#3b82f6", "symbol": "diamond", "line": {"color": "#ffffff", "width": 2}}}, {"x": [3.5, 0.0], "y": [4.0, 0.0], "z": [2.5, 1.0], "mode": "lines", "type": "scatter3d", "name": "Direct LoS Beam (5.2 GHz)", "line": {"color": "#10b981", "width": 6, "dash": "dash"}}, {"x": [1.7336409813231413, 1.807237488471988, 1.8612138847091362, 1.7211611259824977, 1.8492564179353979, 1.7904163110986566, 1.5839023382963493, 2.0473300117304496, 1.900448398530141, 1.7158801826238532, 1.7993651449018744, 2.4233042486361263, 1.693863885157461, 1.6532890020701987, 2.069961628838746, 1.4231924260202766, 1.6924818841980995, 1.7388979052622346, 1.8375629322848759, 1.8106172508704197, 1.8405895059117516, 2.1719999771112732, 1.7072314874160126, 2.0397681494996402, 1.6537842722314127, 1.6568671644888022, 1.8910595365139302, 1.829085160019609, 1.592254831647965, 1.6875763629712734, 1.611949941446984, 1.736769244826466, 2.0432760279603306, 2.524324453437074, 2.889622546306822, 2.667058530104803, 2.7958633614273607, 2.5436164708340154, 2.0167382221459307, 2.276533589099298, 2.2444883598958807, 2.793832740020253, 2.784328653899963, 2.4488929649045352, 2.87599440827636, 2.72512652665034, 2.7646769622412863, 2.3382145864869224, 2.5201450745065834, 2.2954679107007268, 2.2639482038161396, 2.4273890442444586, 2.158644473892605, 2.4653645179540193, 2.18240004628925, 2.52700265057106, 2.3967036903869547, 2.245956415682876, 1.015797320158024, 0.44258964746091023, 0.4572747276200016, 1.5268946639633807, 1.5073692785315014, 0.5746150342388093, 1.0172720524056673, 1.0235601110019763, 0.7610427742866932, 0.8204460938732936, 0.7219087118833711, 1.191858567459535, 0.5870203547236102, 1.4639325074813587, 1.17312207522372, 1.3108083002205368, 0.785332194017469, 0.8532751939884111, 1.2908384348705424, 1.029118866739402, 1.741776923137404, 1.647705557381737, 1.2353587198713445, 1.525304025512124, 1.9108622981105643, 2.8342474066315564, 1.9590651671121575, 1.4450810484214096, 2.034538775942962, 1.8687178723254918, 1.5253787324686587, 2.0328010803128773, 1.977391482366337, 2.2006066456633975, 2.586752206342748], "y": [1.8836763171910405, 1.1627134123537208, 0.4900097409642599, 1.6459153387266083, 2.70932986032628, 2.5075073438107522, 2.8724938438410206, 1.9870698707504932, 3.2009848572622714, 3.230446276114722, 2.58125110778403, 3.2892797983352633, 1.8349138125019322, 1.3056965661728512, 1.4438501679768039, 1.8515288802820524, 2.6421798800832903, 1.4444504451162385, 0.9373840342855883, 3.1829159589723326, 0.6621456049119896, 3.19202041168922, 2.0354739542662816, 1.4368784817503144, 1.14982821220252, 2.6951936409475397, 2.5178924919755015, 3.039718409147109, 2.122656435536461, 0.6412948764636508, 2.6987820914593295, 2.596786948301476, 2.756169085369467, 1.4875763618353135, 1.6076283898910604, 1.3580865824824464, 1.2423966281893462, 1.2937920527236673, 1.0485520586332655, 0.9182124760366984, 1.2301869405026444, 1.529174788022702, 1.5935763438905337, 1.3956423557570385, 1.1104007759233474, 1.0566408953025919, 1.2592198825513823, 1.1065434988811111, 1.4130106029010445, 1.2727706760945108, 1.1758540617478217, 1.344245334212379, 1.1534182410076879, 1.1128317085402026, 0.9092749459589771, 1.0712285968851392, 1.1520334812493762, 0.9649203218841035, 1.5272106487632344, 1.5286263046776614, 1.10871736998631, 1.236105292241564, 1.8169877836730588, 1.1313935555440575, 1.3751773770829496, 1.7069787627324604, 1.2928717463314083, 1.5647658999397598, 1.344103227474035, 2.0054171362613817, 1.8246541197808472, 1.2040264628934498, 1.4057763095164488, 1.9604952251072274, 2.0362986599739306, 1.7562036867810165, 1.8438003797638491, 1.2914359749571, 1.962503530540531, 1.909248846343051, 2.015278305787919, 2.286867975337781, 1.927762373255202, 2.2736873084918976, 1.9252461820850129, 1.921026084016389, 2.146084668166633, 2.1477016650750285, 1.8551170394579992, 1.9497180913462004, 2.041165767325213, 2.0886846450054004, 2.1147024974164723], "z": [0.48435199553680586, 1.1460844895625006, 0.4065423519017096, 0.5348573286908975, 1.3115024950223124, 1.2750742780380866, 2.2154144694450135, 1.2990452385565388, 2.0145545037974455, 1.8978434640761161, 0.45164336194606125, 1.9567948215242341, 0.4919263550978966, 1.9239959097108184, 1.884783816817516, 1.421931766313806, 1.777490280994933, 2.398232338685845, 0.5882439060587477, 2.6338432505113962, 1.4223019233748233, 1.6183992975211532, 0.7691629230315788, 1.2037265228158645, 0.7914593639828146, 2.395958730618834, 1.4114998289837897, 2.3980046872929526, 0.7500152816680485, 2.159565297948741, 1.6357641857985548, 0.9546132490751571, 2.6658297767941175, 0.11411056937584385, 1.3326957739417868, 2.720191466477933, 2.9690415235460748, 2.662582307282589, 1.2607629124911233, 0.25172225062781894, 0.8921301044828228, 0.2870524441919352, 2.1324120166439604, 0.9743924357585579, 2.2231731343133365, 1.7794592358215742, 2.8992924471513093, 0.9296953868930542, 0.9790468276376609, 1.8018612522037392, 1.6224647880636163, 0.1969463073279677, 2.719351477248112, 2.596711454426832, 0.2911293908917276, 0.29970643378044304, 2.053467726946429, 2.389403582865073, 0.6284565401886927, 0.7837020796895644, 0.5516363231967121, 0.4735354926216747, 0.6238410883257179, 0.8391265986033952, 0.7368310332462547, 0.7600674389268505, 0.6658576617552701, 0.8683045175930171, 0.7027112723072126, 0.8585998351637258, 0.9116831478384598, 0.5491197070714596, 0.9001427575646203, 0.5241226735364574, 1.0781365730832453, 0.8409294167315848, 0.5914247452228952, 0.9360700170470307, 2.7190194794777316, 2.7197076335694534, 2.7125546926937183, 2.924799261358036, 2.5594692634987117, 2.679216769334201, 2.8255278885273665, 2.827087086087851, 2.5645447771765983, 2.826168229179956, 2.6438074781477825, 2.719499566372072, 2.6995128424063983, 2.704920725510057, 2.767423470123662], "mode": "markers", "type": "scatter3d", "name": "Boundary Wall / Room Partition", "marker": {"size": 5, "color": "#2b5c8f", "opacity": 0.75}}, {"x": [-1.5], "y": [-1.0], "z": [0.8], "mode": "markers+text", "type": "scatter3d", "name": "Dynamic Walking Target", "text": ["Walking (0.8 m/s)"], "textposition": "top center", "marker": {"size": 14, "color": "#f59e0b", "symbol": "circle"}}, {"x": [1.0], "y": [-1.0], "z": [0.8], "mode": "markers+text", "type": "scatter3d", "name": "Vital Sign Subject", "text": ["Breathing: 12 BPM | Heart: 80 BPM"], "textposition": "top center", "marker": {"size": 14, "color": "#ec4899", "symbol": "circle", "opacity": 1.0}}, {"x": [3.5], "y": [4.0], "z": [2.5], "mode": "markers", "type": "scatter3d", "name": "RF Wavefront Pulse (100 Hz)", "marker": {"size": 8, "color": "#06b6d4", "opacity": 0.6, "symbol": "circle-open"}}];
+        var layout3d = {
+            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#e5e7eb' },
+            margin: { l: 0, r: 0, b: 0, t: 10 },
             scene: {
-                xaxis: { title: 'X Distance (m)', gridcolor: '#374151', zerolinecolor: '#4b5563' },
-                yaxis: { title: 'Y Distance (m)', gridcolor: '#374151', zerolinecolor: '#4b5563' },
-                zaxis: { title: 'Z Height (m)', gridcolor: '#374151', zerolinecolor: '#4b5563' },
-                camera: { eye: { x: 1.5, y: -1.5, z: 1.2 } }
+                xaxis: { title: 'X Distance (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [-2.5, 4.5] },
+                yaxis: { title: 'Y Distance (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [-2.5, 4.5] },
+                zaxis: { title: 'Z Height (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [0, 3.5] },
+                camera: { eye: { x: 1.4, y: -1.6, z: 1.1 } }
             },
-            legend: { x: 0.02, y: 0.98, bgcolor: 'rgba(31,41,55,0.8)' }
+            showlegend: false
         };
-        Plotly.newPlot('plotDiv', data, layout, {responsive: true});
+        Plotly.newPlot('plot3d', traces3d, layout3d, {responsive: true});
+        
+        // Initial 2D Telemetry Charts
+        var tData = [], respData = [], heartData = [], dopplerData = [];
+        for(var i=0; i<50; i++) {
+            tData.push(i * 0.1);
+            respData.push(Math.sin(2 * Math.PI * 0.2 * i * 0.1));
+            heartData.push(Math.sin(2 * Math.PI * 1.33 * i * 0.1));
+            dopplerData.push(27.7);
+        }
+        
+        var layoutChart = function(title, ytitle, color) {
+            return {
+                title: { text: title, font: { size: 12, color: '#9ca3af' }, x: 0.05, y: 0.9 },
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#9ca3af', size: 10 },
+                margin: { l: 40, r: 10, b: 25, t: 25 },
+                xaxis: { title: 'Time (s)', gridcolor: '#1f2937' },
+                yaxis: { title: ytitle, gridcolor: '#1f2937', zerolinecolor: '#374151' },
+                showlegend: false
+            };
+        };
+        
+        Plotly.newPlot('chartResp', [{ x: tData, y: respData, mode: 'lines', line: { color: '#ec4899', width: 2.5 } }], layoutChart('Respiration Waveform (12 BPM)', 'Amp (mm)', '#ec4899'), {responsive: true, displayModeBar: false});
+        Plotly.newPlot('chartHeart', [{ x: tData, y: heartData, mode: 'lines', line: { color: '#ef4444', width: 2 } }], layoutChart('Heartbeat Pulse Wave (80 BPM)', 'Phase (rad)', '#ef4444'), {responsive: true, displayModeBar: false});
+        Plotly.newPlot('chartDoppler', [{ x: tData, y: dopplerData, mode: 'lines', line: { color: '#f59e0b', width: 2 } }], layoutChart('Doppler Walking Shift', 'Freq (Hz)', '#f59e0b'), {responsive: true, displayModeBar: false});
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            var btn = document.getElementById('btnToggle');
+            if(isPlaying) { btn.innerText = "⏸ Pause Pulse Loop"; btn.classList.remove('paused'); }
+            else { btn.innerText = "▶ Resume Pulse Loop"; btn.classList.add('paused'); }
+        }
+        
+        function changeSpeed(val) { simSpeed = parseFloat(val); }
+
+        // Animation Loop
+        var lastTime = 0;
+        function updateSimulation() {
+            if(isPlaying) {
+                var t = (Date.now() - startTime) * 0.001 * simSpeed;
+                
+                // 1. Calculate Walking Target Trajectory
+                var cycle = (t % 10.0) / 10.0; // 10 sec loop
+                var wx = -1.5 + 3.0 * (Math.sin(cycle * 2 * Math.PI) * 0.5 + 0.5);
+                var wy = -1.0 + 2.0 * (Math.sin(cycle * 2 * Math.PI) * 0.5 + 0.5);
+                var wz = 0.8;
+                var velX = 3.0 * Math.PI * 0.1 * Math.cos(cycle * 2 * Math.PI);
+                var curDoppler = Math.round((velX * 5200 * 2 / 300) * 10) / 10;
+                
+                document.getElementById('valWalkPos').innerText = `Pos: (${wx.toFixed(1)}, ${wy.toFixed(1)}, ${wz.toFixed(1)}m)`;
+                document.getElementById('valDoppler').innerText = `${curDoppler >= 0 ? '+' : ''}${curDoppler} Hz`;
+                
+                // 2. Vital Sign Pulsing
+                var respPulse = Math.sin(2 * Math.PI * 0.2 * t);
+                var heartPulse = Math.sin(2 * Math.PI * 1.33 * t);
+                var chestMm = (respPulse * 2.5).toFixed(2);
+                document.getElementById('valVitalStatus').innerText = `Chest Exp: ${chestMm >= 0 ? '+' : ''}${chestMm} mm | Pulse: Active`;
+                
+                // 3. Expanding RF Electromagnetic Wavefront Pulses (Concentric ring points emitting from TX)
+                var pulseRadius = (t * 4.0) % 6.0; // Expanding speed 4 m/s up to 6m
+                var numPts = 36;
+                var px = [], py = [], pz = [];
+                for(var p=0; p<numPts; p++) {
+                    var angle = (p / numPts) * 2 * Math.PI;
+                    px.push(txPos[0] + pulseRadius * Math.cos(angle));
+                    py.push(txPos[1] + pulseRadius * Math.sin(angle));
+                    pz.push(txPos[2] - pulseRadius * 0.3 * (Math.sin(angle*2)*0.2 + 0.8)); // angle downward towards room
+                }
+                
+                // Update 3D Traces (4, 5, 6)
+                Plotly.restyle('plot3d', {
+                    'x': [[wx], [1.0], px],
+                    'y': [[wy], [-1.0], py],
+                    'z': [[wz], [0.8 + respPulse * 0.05], pz],
+                    'marker.size': [[14], [14 + respPulse * 4], [8]],
+                    'marker.opacity': [[1.0], [0.85 + heartPulse * 0.15], [Math.max(0, 0.8 - pulseRadius/6.0)]]
+                }, [4, 5, 6]);
+                
+                // 4. Update Telemetry Charts every ~200ms
+                if(t - lastTime > 0.15) {
+                    lastTime = t;
+                    Plotly.extendTraces('chartResp', { x: [[t]], y: [[respPulse * 2.5]] }, [0], 60);
+                    Plotly.extendTraces('chartHeart', { x: [[t]], y: [[heartPulse]] }, [0], 60);
+                    Plotly.extendTraces('chartDoppler', { x: [[t]], y: [[curDoppler]] }, [0], 60);
+                }
+            }
+            requestAnimationFrame(updateSimulation);
+        }
+        requestAnimationFrame(updateSimulation);
     </script>
 </body>
 </html>
