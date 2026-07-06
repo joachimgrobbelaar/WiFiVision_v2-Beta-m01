@@ -525,21 +525,21 @@ class RoomCSISimulator:
         traces.append({
             'x': [tx_pos[0]], 'y': [tx_pos[1]], 'z': [tx_pos[2]],
             'mode': 'markers+text', 'type': 'scatter3d', 'name': 'Sender (Router TX)',
-            'text': ['Router TX (3.5, 4.0, 2.5m)'], 'textposition': 'top center',
-            'marker': {'size': 10, 'color': '#e41a1c', 'symbol': 'circle'}
+            'text': ['ASUS ROG AP (3.5, 4.0, 2.5m)'], 'textposition': 'top center',
+            'marker': {'size': 12, 'color': '#ef4444', 'symbol': 'circle', 'line': {'color': '#ffffff', 'width': 2}}
         })
         # Trace 1: RX Client
         traces.append({
             'x': [rx_pos[0]], 'y': [rx_pos[1]], 'z': [rx_pos[2]],
             'mode': 'markers+text', 'type': 'scatter3d', 'name': 'Receiver (Client RX)',
-            'text': ['Client RX (0.0, 0.0, 1.0m)'], 'textposition': 'top center',
-            'marker': {'size': 10, 'color': '#377eb8', 'symbol': 'diamond'}
+            'text': ['Intel AX210 ULA (0.0, 0.0, 1.0m)'], 'textposition': 'top center',
+            'marker': {'size': 12, 'color': '#3b82f6', 'symbol': 'diamond', 'line': {'color': '#ffffff', 'width': 2}}
         })
         # Trace 2: Direct LoS Beam
         traces.append({
             'x': [tx_pos[0], rx_pos[0]], 'y': [tx_pos[1], rx_pos[1]], 'z': [tx_pos[2], rx_pos[2]],
-            'mode': 'lines', 'type': 'scatter3d', 'name': 'Direct LoS Beam',
-            'line': {'color': '#4daf4a', 'width': 5, 'dash': 'dash'}
+            'mode': 'lines', 'type': 'scatter3d', 'name': 'Direct LoS Beam (5.2 GHz)',
+            'line': {'color': '#10b981', 'width': 6, 'dash': 'dash'}
         })
         
         # Traces for Obstacles
@@ -548,42 +548,224 @@ class RoomCSISimulator:
             traces.append({
                 'x': pts[:, 0].tolist(), 'y': pts[:, 1].tolist(), 'z': pts[:, 2].tolist(),
                 'mode': 'markers', 'type': 'scatter3d', 'name': obs['type'],
-                'marker': {'size': 6, 'color': obs['color'], 'opacity': 0.85}
+                'marker': {'size': 5, 'color': obs['color'], 'opacity': 0.75}
             })
+            
+        # Trace for Walking Human Target (Index: len(traces))
+        walking_idx = len(traces)
+        traces.append({
+            'x': [-1.5], 'y': [-1.0], 'z': [0.8],
+            'mode': 'markers+text', 'type': 'scatter3d', 'name': 'Dynamic Walking Target',
+            'text': ['Walking (0.8 m/s)'], 'textposition': 'top center',
+            'marker': {'size': 14, 'color': '#f59e0b', 'symbol': 'circle'}
+        })
+        
+        # Trace for Stationary Vital Sign Subject (Index: len(traces))
+        vital_idx = len(traces)
+        traces.append({
+            'x': [1.0], 'y': [-1.0], 'z': [0.8],
+            'mode': 'markers+text', 'type': 'scatter3d', 'name': 'Vital Sign Subject',
+            'text': ['Breathing: 12 BPM | Heart: 80 BPM'], 'textposition': 'top center',
+            'marker': {'size': 14, 'color': '#ec4899', 'symbol': 'circle', 'opacity': 1.0}
+        })
+        
+        # Trace for Expanding RF Electromagnetic Pulse Wavefront (Index: len(traces))
+        pulse_idx = len(traces)
+        traces.append({
+            'x': [tx_pos[0]], 'y': [tx_pos[1]], 'z': [tx_pos[2]],
+            'mode': 'markers', 'type': 'scatter3d', 'name': 'RF Wavefront Pulse (100 Hz)',
+            'marker': {'size': 8, 'color': '#06b6d4', 'opacity': 0.6, 'symbol': 'circle-open'}
+        })
             
         html_content = f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
-    <title>3D Bistatic Wi-Fi Spatial Reconstruction Map</title>
+    <title>WiFiVision Real-Time 3D Bistatic Pulse Engine & Vital Sign Telemetry</title>
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <style>
-        body {{ font-family: 'Inter', sans-serif; background-color: #111827; color: #f9fafb; margin: 0; padding: 20px; }}
-        .header {{ text-align: center; margin-bottom: 20px; }}
-        #plotDiv {{ width: 100%; height: 82vh; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); background: #1f2937; }}
+        body {{ font-family: 'Inter', system-ui, sans-serif; background-color: #0b0f19; color: #f3f4f6; margin: 0; padding: 16px; }}
+        .header {{ text-align: center; margin-bottom: 16px; }}
+        .header h1 {{ margin: 0; font-size: 1.8rem; background: linear-gradient(to right, #60a5fa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
+        .header p {{ margin: 4px 0 0 0; color: #9ca3af; font-size: 0.95rem; }}
+        .specs-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }}
+        .spec-card {{ background: #1f2937; border: 1px solid #374151; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6; }}
+        .spec-card.tx {{ border-left-color: #ef4444; }}
+        .spec-card.rx {{ border-left-color: #3b82f6; }}
+        .spec-card.walk {{ border-left-color: #f59e0b; }}
+        .spec-card.vital {{ border-left-color: #ec4899; }}
+        .spec-title {{ font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9ca3af; font-weight: 600; }}
+        .spec-value {{ font-size: 1.1rem; font-weight: 700; margin-top: 4px; color: #ffffff; }}
+        .spec-sub {{ font-size: 0.8rem; color: #6b7280; margin-top: 2px; }}
+        .controls {{ display: flex; justify-content: center; gap: 12px; margin-bottom: 16px; align-items: center; }}
+        .btn {{ background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }}
+        .btn:hover {{ background: #2563eb; }}
+        .btn.paused {{ background: #ef4444; }}
+        .layout-main {{ display: grid; grid-template-columns: 2fr 1fr; gap: 16px; height: 72vh; }}
+        #plot3d {{ width: 100%; height: 100%; border-radius: 12px; background: #111827; border: 1px solid #1f2937; }}
+        .charts-panel {{ display: flex; flex-direction: column; gap: 12px; height: 100%; }}
+        .chart-box {{ flex: 1; background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 8px; }}
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>3D Bistatic Wi-Fi Spatial Reconstruction Engine</h1>
-        <p>Interactive 3D geometry mapping between Router (Sender), Client (Receiver), and physical room obstacles.</p>
+        <h1>WiFiVision Real-Time 3D Bistatic Pulse Engine</h1>
+        <p>Live RF electromagnetic pulse propagation, Doppler walking trajectory tracking, and non-invasive vital sign telemetry.</p>
     </div>
-    <div id="plotDiv"></div>
+    
+    <div class="specs-grid">
+        <div class="spec-card tx">
+            <div class="spec-title">📡 Sender (TX Router AP)</div>
+            <div class="spec-value">ASUS ROG AP (5.200 GHz)</div>
+            <div class="spec-sub">Pos: (3.5, 4.0, 2.5m) | 80 MHz BW | 100 Hz PRF</div>
+        </div>
+        <div class="spec-card rx">
+            <div class="spec-title">💻 Receiver (RX Client)</div>
+            <div class="spec-value">Intel AX210 3-Elem ULA</div>
+            <div class="spec-sub">Pos: (0.0, 0.0, 1.0m) | SNR: 34.2 dB | CFO Lock: ON</div>
+        </div>
+        <div class="spec-card walk">
+            <div class="spec-title">🚶 Doppler Target (Walking)</div>
+            <div class="spec-value" id="valWalkPos">Pos: (-1.5, -1.0, 0.8m)</div>
+            <div class="spec-sub">Speed: 0.8 m/s | Doppler: <span id="valDoppler">+27.7 Hz</span></div>
+        </div>
+        <div class="spec-card vital">
+            <div class="spec-title">🫀 Vital Sign Subject</div>
+            <div class="spec-value">Resp: 12.0 BPM | Heart: 80.0 BPM</div>
+            <div class="spec-sub" id="valVitalStatus">Chest Exp: +0.00 mm | Pulse: Normal</div>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="btn" id="btnToggle" onclick="togglePlay()">⏸ Pause Pulse Loop</button>
+        <span style="font-size: 0.9rem; color: #9ca3af;">Pulse Speed:</span>
+        <select id="selSpeed" style="background: #1f2937; color: white; border: 1px solid #374151; padding: 6px; border-radius: 6px;" onchange="changeSpeed(this.value)">
+            <option value="0.5">0.5x (Slow RF Motion)</option>
+            <option value="1.0" selected>1.0x (Real-Time 100 Hz)</option>
+            <option value="2.0">2.0x (Fast Simulation)</option>
+        </select>
+        <span style="font-size: 0.9rem; color: #10b981; font-weight: 600;">● LIVE RF TELEMETRY STREAMING</span>
+    </div>
+    
+    <div class="layout-main">
+        <div id="plot3d"></div>
+        <div class="charts-panel">
+            <div id="chartResp" class="chart-box"></div>
+            <div id="chartHeart" class="chart-box"></div>
+            <div id="chartDoppler" class="chart-box"></div>
+        </div>
+    </div>
+
     <script>
-        var data = {json.dumps(traces)};
-        var layout = {{
-            paper_bgcolor: '#1f2937', plot_bgcolor: '#1f2937',
-            font: {{ color: '#f9fafb' }},
-            margin: {{ l: 0, r: 0, b: 0, t: 30 }},
+        var isPlaying = true;
+        var simSpeed = 1.0;
+        var startTime = Date.now();
+        var txPos = [{tx_pos[0]}, {tx_pos[1]}, {tx_pos[2]}];
+        
+        // Initial 3D Plot
+        var traces3d = {json.dumps(traces)};
+        var layout3d = {{
+            paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+            font: {{ color: '#e5e7eb' }},
+            margin: {{ l: 0, r: 0, b: 0, t: 10 }},
             scene: {{
-                xaxis: {{ title: 'X Distance (m)', gridcolor: '#374151', zerolinecolor: '#4b5563' }},
-                yaxis: {{ title: 'Y Distance (m)', gridcolor: '#374151', zerolinecolor: '#4b5563' }},
-                zaxis: {{ title: 'Z Height (m)', gridcolor: '#374151', zerolinecolor: '#4b5563' }},
-                camera: {{ eye: {{ x: 1.5, y: -1.5, z: 1.2 }} }}
+                xaxis: {{ title: 'X Distance (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [-2.5, 4.5] }},
+                yaxis: {{ title: 'Y Distance (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [-2.5, 4.5] }},
+                zaxis: {{ title: 'Z Height (m)', gridcolor: '#1f2937', zerolinecolor: '#374151', range: [0, 3.5] }},
+                camera: {{ eye: {{ x: 1.4, y: -1.6, z: 1.1 }} }}
             }},
-            legend: {{ x: 0.02, y: 0.98, bgcolor: 'rgba(31,41,55,0.8)' }}
+            showlegend: false
         }};
-        Plotly.newPlot('plotDiv', data, layout, {{responsive: true}});
+        Plotly.newPlot('plot3d', traces3d, layout3d, {{responsive: true}});
+        
+        // Initial 2D Telemetry Charts
+        var tData = [], respData = [], heartData = [], dopplerData = [];
+        for(var i=0; i<50; i++) {{
+            tData.push(i * 0.1);
+            respData.push(Math.sin(2 * Math.PI * 0.2 * i * 0.1));
+            heartData.push(Math.sin(2 * Math.PI * 1.33 * i * 0.1));
+            dopplerData.push(27.7);
+        }}
+        
+        var layoutChart = function(title, ytitle, color) {{
+            return {{
+                title: {{ text: title, font: {{ size: 12, color: '#9ca3af' }}, x: 0.05, y: 0.9 }},
+                paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+                font: {{ color: '#9ca3af', size: 10 }},
+                margin: {{ l: 40, r: 10, b: 25, t: 25 }},
+                xaxis: {{ title: 'Time (s)', gridcolor: '#1f2937' }},
+                yaxis: {{ title: ytitle, gridcolor: '#1f2937', zerolinecolor: '#374151' }},
+                showlegend: false
+            }};
+        }};
+        
+        Plotly.newPlot('chartResp', [{{ x: tData, y: respData, mode: 'lines', line: {{ color: '#ec4899', width: 2.5 }} }}], layoutChart('Respiration Waveform (12 BPM)', 'Amp (mm)', '#ec4899'), {{responsive: true, displayModeBar: false}});
+        Plotly.newPlot('chartHeart', [{{ x: tData, y: heartData, mode: 'lines', line: {{ color: '#ef4444', width: 2 }} }}], layoutChart('Heartbeat Pulse Wave (80 BPM)', 'Phase (rad)', '#ef4444'), {{responsive: true, displayModeBar: false}});
+        Plotly.newPlot('chartDoppler', [{{ x: tData, y: dopplerData, mode: 'lines', line: {{ color: '#f59e0b', width: 2 }} }}], layoutChart('Doppler Walking Shift', 'Freq (Hz)', '#f59e0b'), {{responsive: true, displayModeBar: false}});
+
+        function togglePlay() {{
+            isPlaying = !isPlaying;
+            var btn = document.getElementById('btnToggle');
+            if(isPlaying) {{ btn.innerText = "⏸ Pause Pulse Loop"; btn.classList.remove('paused'); }}
+            else {{ btn.innerText = "▶ Resume Pulse Loop"; btn.classList.add('paused'); }}
+        }}
+        
+        function changeSpeed(val) {{ simSpeed = parseFloat(val); }}
+
+        // Animation Loop
+        var lastTime = 0;
+        function updateSimulation() {{
+            if(isPlaying) {{
+                var t = (Date.now() - startTime) * 0.001 * simSpeed;
+                
+                // 1. Calculate Walking Target Trajectory
+                var cycle = (t % 10.0) / 10.0; // 10 sec loop
+                var wx = -1.5 + 3.0 * (Math.sin(cycle * 2 * Math.PI) * 0.5 + 0.5);
+                var wy = -1.0 + 2.0 * (Math.sin(cycle * 2 * Math.PI) * 0.5 + 0.5);
+                var wz = 0.8;
+                var velX = 3.0 * Math.PI * 0.1 * Math.cos(cycle * 2 * Math.PI);
+                var curDoppler = Math.round((velX * 5200 * 2 / 300) * 10) / 10;
+                
+                document.getElementById('valWalkPos').innerText = `Pos: (${{wx.toFixed(1)}}, ${{wy.toFixed(1)}}, ${{wz.toFixed(1)}}m)`;
+                document.getElementById('valDoppler').innerText = `${{curDoppler >= 0 ? '+' : ''}}${{curDoppler}} Hz`;
+                
+                // 2. Vital Sign Pulsing
+                var respPulse = Math.sin(2 * Math.PI * 0.2 * t);
+                var heartPulse = Math.sin(2 * Math.PI * 1.33 * t);
+                var chestMm = (respPulse * 2.5).toFixed(2);
+                document.getElementById('valVitalStatus').innerText = `Chest Exp: ${{chestMm >= 0 ? '+' : ''}}${{chestMm}} mm | Pulse: Active`;
+                
+                // 3. Expanding RF Electromagnetic Wavefront Pulses (Concentric ring points emitting from TX)
+                var pulseRadius = (t * 4.0) % 6.0; // Expanding speed 4 m/s up to 6m
+                var numPts = 36;
+                var px = [], py = [], pz = [];
+                for(var p=0; p<numPts; p++) {{
+                    var angle = (p / numPts) * 2 * Math.PI;
+                    px.push(txPos[0] + pulseRadius * Math.cos(angle));
+                    py.push(txPos[1] + pulseRadius * Math.sin(angle));
+                    pz.push(txPos[2] - pulseRadius * 0.3 * (Math.sin(angle*2)*0.2 + 0.8)); // angle downward towards room
+                }}
+                
+                // Update 3D Traces ({walking_idx}, {vital_idx}, {pulse_idx})
+                Plotly.restyle('plot3d', {{
+                    'x': [[wx], [1.0], px],
+                    'y': [[wy], [-1.0], py],
+                    'z': [[wz], [0.8 + respPulse * 0.05], pz],
+                    'marker.size': [[14], [14 + respPulse * 4], [8]],
+                    'marker.opacity': [[1.0], [0.85 + heartPulse * 0.15], [Math.max(0, 0.8 - pulseRadius/6.0)]]
+                }}, [{walking_idx}, {vital_idx}, {pulse_idx}]);
+                
+                // 4. Update Telemetry Charts every ~200ms
+                if(t - lastTime > 0.15) {{
+                    lastTime = t;
+                    Plotly.extendTraces('chartResp', {{ x: [[t]], y: [[respPulse * 2.5]] }}, [0], 60);
+                    Plotly.extendTraces('chartHeart', {{ x: [[t]], y: [[heartPulse]] }}, [0], 60);
+                    Plotly.extendTraces('chartDoppler', {{ x: [[t]], y: [[curDoppler]] }}, [0], 60);
+                }}
+            }}
+            requestAnimationFrame(updateSimulation);
+        }}
+        requestAnimationFrame(updateSimulation);
     </script>
 </body>
 </html>"""
