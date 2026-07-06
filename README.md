@@ -117,9 +117,11 @@ git pull origin main
 ### 2. Create a Feature Branch for New Versions or Ideas
 When trying out a new algorithm or different configuration:
 
+> 💡 **Naming Convention Tip**: Try naming uploads and branches as `WiFiVision_v2-"Stage"-"m/c"-"version"` (e.g., `WiFiVision_v2-Beta-m-02` or `WiFiVision_v2-Dev-c-01`).
+
 ```bash
 # Example: Creating a branch to test a new Doppler tracking filter
-git checkout -b feature/doppler-tracking-v2
+git checkout -b WiFiVision_v2-Beta-m-02
 ```
 
 ### 3. Save & Commit Your Changes
