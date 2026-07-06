@@ -1,0 +1,17 @@
+# Python Virtual Environment
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build & PyInstaller Output
+build/
+dist/
+*.spec
+
+# OS & Logs
+.DS_Store
+*.log
