@@ -1,4 +1,4 @@
-# MaliosDark & Joachim Grobbelaar's MaliosDark/RuView & MaliosDark/wifi-3d-fusion Beta v2.0
+# Carel & Joachim Grobbelaar's 
 # WiFiVision v2.0 Beta (m01)
 ### Advanced Agentic Wi-Fi Channel State Information (CSI) 3D Spatial Mapping, Material Sensing & Vital Sign Tracking Pipeline
 
