@@ -26,6 +26,7 @@ Physics & Math Formulation:
 
 import numpy as np
 from sklearn.cluster import DBSCAN
+from scipy import ndimage
 from typing import List, Dict, Tuple, Optional, Any
 from dsp_engine import CSIDSPEngine
 
@@ -338,6 +339,127 @@ class GeometricMapper:
             })
             
         return obstacles
+
+    def reconstruct_surface_gaussian_splats(self, points: np.ndarray, grid_size: int = 200,
+                                            extent_m: float = 5.0, sigma_init: float = 0.15,
+                                            step_size: float = 0.05, max_steps: int = 40) -> Dict[str, Any]:
+        """
+        Treat each reflection point as a 2D Gaussian splat that continuously grows out in all directions
+        over a refined surface grid. Growth continues until a splat meets another splat (or room boundary),
+        halting growth in that direction only (Voronoi-bounded anisotropic region growing).
+        """
+        x_lin = np.linspace(-extent_m / 2.0, extent_m / 2.0, grid_size)
+        y_lin = np.linspace(-extent_m / 2.0, extent_m / 2.0, grid_size)
+        xx, yy = np.meshgrid(x_lin, y_lin)
+        
+        if len(points) == 0:
+            return {
+                "X": xx, "Y": yy,
+                "Z_surface": np.zeros_like(xx),
+                "collision_mask": np.zeros_like(xx, dtype=bool),
+                "edge_map": np.zeros_like(xx)
+            }
+            
+        pts_2d = points[:, :2]
+        weights = points[:, 2] if points.shape[1] > 2 else np.ones(len(pts_2d))
+        n_pts = len(pts_2d)
+        
+        # We model directional growth limits for each splat around 16 angular sectors (0 to 360 deg)
+        n_sectors = 16
+        sector_angles = np.linspace(0, 2 * np.pi, n_sectors, endpoint=False)
+        # R_limits[i, s] stores the maximum growth radius of splat i in sector s
+        R_limits = np.full((n_pts, n_sectors), sigma_init, dtype=float)
+        
+        # Simulate continuous region growth
+        for step in range(max_steps):
+            R_limits += step_size
+            # Check for wavefront collisions between pairwise splats
+            for i in range(n_pts):
+                for j in range(i + 1, n_pts):
+                    dx = pts_2d[j, 0] - pts_2d[i, 0]
+                    dy = pts_2d[j, 1] - pts_2d[i, 1]
+                    dist_ij = np.hypot(dx, dy)
+                    if dist_ij < 1e-4:
+                        continue
+                    
+                    # Find sector from i to j and j to i
+                    angle_ij = np.mod(np.arctan2(dy, dx), 2 * np.pi)
+                    angle_ji = np.mod(angle_ij + np.pi, 2 * np.pi)
+                    
+                    s_ij = int(np.argmin(np.abs(np.angle(np.exp(1j * (sector_angles - angle_ij))))))
+                    s_ji = int(np.argmin(np.abs(np.angle(np.exp(1j * (sector_angles - angle_ji))))))
+                    
+                    # If expanding wavefronts collide, freeze growth along collision line!
+                    if R_limits[i, s_ij] + R_limits[j, s_ji] >= dist_ij:
+                        half_dist = dist_ij / 2.0
+                        R_limits[i, s_ij] = min(R_limits[i, s_ij], half_dist)
+                        R_limits[j, s_ji] = min(R_limits[j, s_ji], half_dist)
+                        
+        # Reconstruct continuous surface height field across pixel grid using collision-bounded splats
+        Z_surface = np.zeros_like(xx, dtype=float)
+        collision_mask = np.zeros_like(xx, dtype=bool)
+        
+        # For each pixel, accumulate contributions from nearby splats bounded by R_limits
+        for i in range(n_pts):
+            dx_grid = xx - pts_2d[i, 0]
+            dy_grid = yy - pts_2d[i, 1]
+            dist_grid = np.hypot(dx_grid, dy_grid)
+            angle_grid = np.mod(np.arctan2(dy_grid, dx_grid), 2 * np.pi)
+            
+            # Map grid angles to sector indices
+            s_grid = np.round((angle_grid / (2 * np.pi)) * n_sectors).astype(int) % n_sectors
+            max_r = R_limits[i, s_grid]
+            
+            # Splat contributes within its collision boundary
+            valid_mask = dist_grid <= (max_r * 1.5)
+            sigma_eff = max_r * 0.45 # Effective width proportional to allowed boundary
+            
+            # 2D Gaussian profile
+            gauss_contrib = weights[i] * np.exp(-0.5 * (dist_grid / np.maximum(sigma_eff, 1e-3)) ** 2)
+            Z_surface += np.where(valid_mask, gauss_contrib, 0.0)
+            
+            # Mark collision borders where growth was truncated by neighbors
+            collision_mask |= (dist_grid > max_r) & (dist_grid < max_r * 1.2) & (max_r < (sigma_init + max_steps * step_size * 0.9))
+            
+        # Edge Detection: Apply spatial gradient operators across splatted surface field
+        edge_map = self.compute_edge_detection(Z_surface, method='sobel')
+        
+        return {
+            "X": xx, "Y": yy,
+            "Z_surface": Z_surface,
+            "collision_mask": collision_mask,
+            "edge_map": edge_map,
+            "R_limits": R_limits
+        }
+
+    def compute_edge_detection(self, surface_grid: np.ndarray, method: str = 'sobel') -> np.ndarray:
+        """
+        Apply spatial edge detection across the Gaussian splatted surface grid
+        to delineate structural wall and obstacle contours.
+        
+        Args:
+            surface_grid: 2D array representing surface intensity / elevation.
+            method: Gradient operator ('sobel', 'laplace', 'canny_approx').
+            
+        Returns:
+            2D edge magnitude map of the same shape.
+        """
+        if method == 'sobel':
+            grad_x = ndimage.sobel(surface_grid, axis=1)
+            grad_y = ndimage.sobel(surface_grid, axis=0)
+            edge_map = np.hypot(grad_x, grad_y)
+        elif method == 'laplace':
+            edge_map = np.abs(ndimage.laplace(surface_grid))
+        else:
+            smoothed = ndimage.gaussian_filter(surface_grid, sigma=1.0)
+            grad_x = ndimage.sobel(smoothed, axis=1)
+            grad_y = ndimage.sobel(smoothed, axis=0)
+            edge_map = np.hypot(grad_x, grad_y)
+            
+        max_val = np.max(edge_map)
+        if max_val > 0:
+            edge_map /= max_val
+        return edge_map
 
 if __name__ == "__main__":
     print("[*] Verifying GeometricMapper module...")

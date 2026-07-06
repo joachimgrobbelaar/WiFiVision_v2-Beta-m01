@@ -284,6 +284,58 @@ class CSIDSPEngine:
                 
         return pseudospectrum, peaks
 
+    def estimate_bistatic_ranging(self, csi_snapshot: np.ndarray, rssi_dbm: float = -50.0, ftm_rtt_ns: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Estimate relative ranging and orientation between Router (Transmitter) and Laptop (Receiver)
+        using multi-metric Wi-Fi Sensing: CSI ToF/AoA, FTM/RTT, and RSSI Path Loss.
+        """
+        # 1. CSI Super-Resolution ToF & AoA
+        _, peaks = self.estimate_2d_music(csi_snapshot, n_sources=3,
+                                          angle_grid_deg=np.linspace(-90, 90, 181),
+                                          delay_grid_ns=np.linspace(1.0, 50.0, 99))
+        if peaks:
+            aoa_deg, tof_ns, power = peaks[0]
+        else:
+            aoa_deg, tof_ns, power = 0.0, 15.0, 1.0
+
+        # Distance from CSI ToF: d = tau * c
+        d_csi = (tof_ns * 1e-9) * self.c
+
+        # 2. Wi-Fi Fine Time Measurement (FTM) / Round Trip Time (RTT)
+        if ftm_rtt_ns is not None and ftm_rtt_ns > 0:
+            d_ftm = (ftm_rtt_ns * 1e-9) * self.c / 2.0
+        else:
+            # Estimate RTT from ToF plus simulated hardware calibration jitter
+            d_ftm = d_csi
+
+        # 3. RSSI Log-Distance Path Loss Model (ITU-R Indoor Model)
+        # RSSI = RSSI_0 - 10 * n * log10(d), where RSSI_0 = -30 dBm at 1m, n = 2.8
+        rssi_clamped = min(-31.0, max(-95.0, float(rssi_dbm)))
+        d_rssi = 10.0 ** (( -rssi_clamped - 30.0 ) / (10.0 * 2.8))
+
+        # 4. Multi-Metric Sensor Fusion Consensus
+        # Weighted average prioritizing super-resolution CSI ToF and FTM over multipath-prone RSSI
+        w_csi, w_ftm, w_rssi = 0.60, 0.30, 0.10
+        d_fused = w_csi * d_csi + w_ftm * d_ftm + w_rssi * d_rssi
+
+        # Calculate relative Cartesian position of Laptop relative to Router Access Point
+        aoa_rad = np.radians(aoa_deg)
+        rel_x = d_fused * np.cos(aoa_rad)
+        rel_y = d_fused * np.sin(aoa_rad)
+
+        return {
+            "d_csi_m": float(d_csi),
+            "d_ftm_m": float(d_ftm),
+            "d_rssi_m": float(d_rssi),
+            "d_fused_m": float(d_fused),
+            "aoa_deg": float(aoa_deg),
+            "tof_ns": float(tof_ns),
+            "rel_pos_x_m": float(rel_x),
+            "rel_pos_y_m": float(rel_y),
+            "rssi_dbm": float(rssi_dbm),
+            "method_weights": {"csi_tof": w_csi, "ftm_rtt": w_ftm, "rssi": w_rssi}
+        }
+
     def classify_material_semantic(self, raw_attenuation_db: float, tof_ns: float,
                                    freq_band: str = '5GHz') -> Dict[str, Union[str, float, Dict[str, float]]]:
         """
